@@ -3,32 +3,35 @@ import 'package:flutter_draughts_checkers_game/coordinate.dart';
 import 'package:flutter_draughts_checkers_game/killing.dart';
 import 'package:flutter_draughts_checkers_game/men.dart';
 
-typedef OnWalkableAfterKilling = bool Function(Coordinate newCoor, Killed killed);
+typedef OnWalkableAfterKilling = bool Function(
+    Coordinate newCoor, Killed killed);
 typedef OnKingWalkable = void Function(Coordinate newCoor);
-typedef OnKingWalkableAfterKilling = void Function(Coordinate newCoor, Killed killed);
+typedef OnKingWalkableAfterKilling = void Function(
+    Coordinate newCoor, Killed killed);
 typedef OnKingUnWalkable = void Function(Coordinate newCoor);
 
 class GameTable {
-
   static const int MODE_WALK_NORMAL = 1; // walk to empty or walk to first kill.
-  static const int MODE_WALK_AFTER_KILLING = 2; // walk after kill to 2 3 4.. enemy.
-  static const int MODE_AFTER_KILLING = 3; // calculation to future that men can walk.
+  static const int MODE_WALK_AFTER_KILLING =
+      2; // walk after kill to 2 3 4.. enemy.
+  static const int MODE_AFTER_KILLING =
+      3; // calculation to future that men can walk.
 
   int countRow = 8;
   int countCol = 8;
   List<List<BlockTable>> table;
   int currentPlayerTurn = 2;
 
-  List<Coordinate> listTempForKingWalkCalculation = List();
+  List<Coordinate> listTempForKingWalkCalculation = [];
 
   GameTable({this.countRow = 8, this.countCol = 8}) {
     init();
   }
 
   init() {
-    table = List();
+    table = [];
     for (int row = 0; row < countRow; row++) {
-      List<BlockTable> listBlockTable = List();
+      List<BlockTable> listBlockTable = [];
       for (int col = 0; col < countCol; col++) {
         listBlockTable.add(BlockTable(row: row, col: col));
       }
@@ -40,6 +43,10 @@ class GameTable {
   void initMenOnTable() {
     initMenOnTableRow(player: 1, row: 0);
     initMenOnTableRow(player: 1, row: 1);
+    initMenOnTableRow(player: 1, row: 2);
+    initMenOnTableRow(player: 1, row: 3);
+    initMenOnTableRow(player: 2, row: countRow - 4);
+    initMenOnTableRow(player: 2, row: countRow - 3);
     initMenOnTableRow(player: 2, row: countRow - 2);
     initMenOnTableRow(player: 2, row: countRow - 1);
   }
@@ -84,48 +91,49 @@ class GameTable {
   }
 
   bool checkWalkablePlayer1(Men men, {int mode = MODE_WALK_NORMAL}) {
-    bool movableLeft = checkWalkablePlayer1Left(
-        men.coordinate, mode: mode, onKilling: (newCoor, killed) {
+    bool movableLeft = checkWalkablePlayer1Left(men.coordinate, mode: mode,
+        onKilling: (newCoor, killed) {
       int newMode = MODE_AFTER_KILLING;
-      return checkWalkablePlayer1(
-          Men.of(men, newCoor: newCoor), mode: newMode);
+      return checkWalkablePlayer1(Men.of(men, newCoor: newCoor), mode: newMode);
     });
 
-    bool movableRight = checkWalkablePlayer1Right(
-        men.coordinate, mode: mode, onKilling: (newCoor, killed) {
+    bool movableRight = checkWalkablePlayer1Right(men.coordinate, mode: mode,
+        onKilling: (newCoor, killed) {
       int newMode = MODE_AFTER_KILLING;
-      return checkWalkablePlayer1(
-          Men.of(men, newCoor: newCoor), mode: newMode);
+      return checkWalkablePlayer1(Men.of(men, newCoor: newCoor), mode: newMode);
     });
 
     return movableLeft || movableRight;
   }
-
 
   bool checkWalkablePlayer2(Men men, {int mode = MODE_WALK_NORMAL}) {
-    bool movableLeft = checkWalkablePlayer2Left(
-        men.coordinate, mode: mode, onKilling: (newCoor, killed) {
+    bool movableLeft = checkWalkablePlayer2Left(men.coordinate, mode: mode,
+        onKilling: (newCoor, killed) {
       int newMode = MODE_AFTER_KILLING;
 
-      return checkWalkablePlayer2(
-          Men.of(men, newCoor: newCoor), mode: newMode);
+      return checkWalkablePlayer2(Men.of(men, newCoor: newCoor), mode: newMode);
     });
 
-    bool movableRight = checkWalkablePlayer2Right(
-        men.coordinate, mode: mode, onKilling: (newCoor, killed) {
+    bool movableRight = checkWalkablePlayer2Right(men.coordinate, mode: mode,
+        onKilling: (newCoor, killed) {
       int newMode = MODE_AFTER_KILLING;
-      return checkWalkablePlayer2(
-          Men.of(men, newCoor: newCoor), mode: newMode);
+      return checkWalkablePlayer2(Men.of(men, newCoor: newCoor), mode: newMode);
     });
 
     return movableLeft || movableRight;
   }
 
-  bool checkWalkable({int mode, Coordinate next, Coordinate nextIfKilling, OnWalkableAfterKilling onKilling}) {
+  bool checkWalkable(
+      {int mode,
+      Coordinate next,
+      Coordinate nextIfKilling,
+      OnWalkableAfterKilling onKilling}) {
+    bool mustKill = false;
     if (hasMen(next)) {
       if (hasMenEnemy(next)) {
         if (isBlockAvailable(nextIfKilling) && !hasMen(nextIfKilling)) {
           print("x = $mode");
+          mustKill = true;
           if (mode == MODE_WALK_NORMAL || mode == MODE_WALK_AFTER_KILLING) {
             setHighlightWalkableAfterKilling(nextIfKilling);
           }
@@ -141,9 +149,29 @@ class GameTable {
         }
       }
     } else {
-      if (mode == MODE_WALK_NORMAL) {
+      if (mode == MODE_WALK_NORMAL && !mustKill) {
         setHighlightWalkable(next);
         return true;
+      }
+    }
+    return false;
+  }
+
+  bool canKill(Men men, Coordinate coor) {
+    final block = [
+      coor.nextTopLeft(),
+      coor.nextTopRight(),
+      coor.nextBottomRight(),
+      coor.nextBottomLeft()
+    ];
+
+    for (final c in block) {
+      if (hasMen(c)) {
+        final other = getBlockTable(c).men;
+        if (other.player != men.player) {
+          print("Can kill has men");
+          return true;
+        }
       }
     }
     return false;
@@ -153,7 +181,7 @@ class GameTable {
       {int mode, OnWalkableAfterKilling onKilling}) {
     return checkWalkable(
         mode: mode,
-        next: Coordinate(row: coor.row - 1, col: coor.col + 1),
+        next: coor.nextBottomRight(),
         nextIfKilling: Coordinate(row: coor.row - 2, col: coor.col + 2),
         onKilling: onKilling);
   }
@@ -162,7 +190,7 @@ class GameTable {
       {int mode, OnWalkableAfterKilling onKilling}) {
     return checkWalkable(
         mode: mode,
-        next: Coordinate(row: coor.row - 1, col: coor.col - 1),
+        next: coor.nextBottomLeft(),
         nextIfKilling: Coordinate(row: coor.row - 2, col: coor.col - 2),
         onKilling: onKilling);
   }
@@ -171,7 +199,7 @@ class GameTable {
       {int mode, OnWalkableAfterKilling onKilling}) {
     return checkWalkable(
         mode: mode,
-        next: Coordinate(row: coor.row + 1, col: coor.col + 1),
+        next: coor.nextTopRight(),
         nextIfKilling: Coordinate(row: coor.row + 2, col: coor.col + 2),
         onKilling: onKilling);
   }
@@ -180,7 +208,7 @@ class GameTable {
       {int mode, OnWalkableAfterKilling onKilling}) {
     return checkWalkable(
         mode: mode,
-        next: Coordinate(row: coor.row + 1, col: coor.col - 1),
+        next: coor.nextTopLeft(),
         nextIfKilling: Coordinate(row: coor.row + 2, col: coor.col - 2),
         onKilling: onKilling);
   }
@@ -215,7 +243,9 @@ class GameTable {
     if (coor == null) {
       return false;
     }
-    return coor.row >= 0 && coor.row < countRow && coor.col >= 0 &&
+    return coor.row >= 0 &&
+        coor.row < countRow &&
+        coor.col >= 0 &&
         coor.col < countCol;
   }
 
@@ -254,8 +284,8 @@ class GameTable {
   void addMen(Coordinate coor, {int player = 1, bool isKing = false}) {
     if (!isBlockTypeF(coor)) {
 //      List<Men> listMen = player == 1 ? listMenPlayer1 : listMenPlayer2;
-      Men men = Men(
-          player: player, coordinate: Coordinate.of(coor), isKing: isKing);
+      Men men =
+          Men(player: player, coordinate: Coordinate.of(coor), isKing: isKing);
 //      listMen.add(men);
       getBlockTable(coor).men = men;
     }
@@ -283,7 +313,10 @@ class GameTable {
     Killed killable2 = checkWalkableKingPath(men, mode, addRow: -1, addCol: 1);
     Killed killable3 = checkWalkableKingPath(men, mode, addRow: 1, addCol: -1);
     Killed killable4 = checkWalkableKingPath(men, mode, addRow: 1, addCol: 1);
-    return killable1.isKilled || killable2.isKilled || killable3.isKilled || killable4.isKilled;
+    return killable1.isKilled ||
+        killable2.isKilled ||
+        killable3.isKilled ||
+        killable4.isKilled;
   }
 
   Killed checkWalkableKingPath(Men men, int mode,
@@ -300,9 +333,10 @@ class GameTable {
     for (int i = 0; i < countRow; i++) {
       Coordinate currentCoor = Coordinate(row: row, col: col);
 
-      bool isWalked = listTempForKingWalkCalculation.where((coor) {
-        return coor.row == row && coor.col == col;
-      })
+      bool isWalked = listTempForKingWalkCalculation
+          .where((coor) {
+            return coor.row == row && coor.col == col;
+          })
           .toList()
           .isNotEmpty;
 
@@ -315,42 +349,34 @@ class GameTable {
         }
       }
 
-      bool walkable = checkWalkableKingInBlock(mode,
-          currentCoor,
-          addRow: addRow,
-          addCol: addCol,
-          onKingWalkable: (newCoor) {
-            if (mode == MODE_WALK_NORMAL) {
-              setHighlightWalkable(newCoor);
-            }
-          },
-          onKingWalkableAfterKilling: (newCoor, killed) {
-            if (isBlockAvailable(newCoor)) {
-              killable = killed;
-              getBlockTable(newCoor).victim = killed;
-              if (mode == MODE_WALK_NORMAL) {
-                setHighlightWalkableAfterKilling(newCoor);
-              }
-              if (mode == MODE_WALK_AFTER_KILLING) {
-                setHighlightWalkableAfterKilling(newCoor);
-              }
+      bool walkable = checkWalkableKingInBlock(mode, currentCoor,
+          addRow: addRow, addCol: addCol, onKingWalkable: (newCoor) {
+        if (mode == MODE_WALK_NORMAL) {
+          setHighlightWalkable(newCoor);
+        }
+      }, onKingWalkableAfterKilling: (newCoor, killed) {
+        if (isBlockAvailable(newCoor)) {
+          killable = killed;
+          getBlockTable(newCoor).victim = killed;
+          if (mode == MODE_WALK_NORMAL) {
+            setHighlightWalkableAfterKilling(newCoor);
+          }
+          if (mode == MODE_WALK_AFTER_KILLING) {
+            setHighlightWalkableAfterKilling(newCoor);
+          }
 
-              print("${newCoor.row},${newCoor.col}");
-              bool killableMore = checkWalkableKing(Men.of(men, newCoor: newCoor), MODE_AFTER_KILLING);
+          print("${newCoor.row},${newCoor.col}");
+          bool killableMore = checkWalkableKing(
+              Men.of(men, newCoor: newCoor), MODE_AFTER_KILLING);
 
-              print("killableMore = $killableMore");
-              getBlockTable(newCoor).killableMore = killableMore;
-            }
-          },
-          onKingUnwalkable: (newCoor) {
-
-          });
-
+          print("killableMore = $killableMore");
+          getBlockTable(newCoor).killableMore = killableMore;
+        }
+      }, onKingUnwalkable: (newCoor) {});
 
       if (!walkable) {
         return killable;
       }
-
 
       row += addRow;
       col += addCol;
@@ -363,11 +389,11 @@ class GameTable {
   }
 
   bool checkWalkableKingInBlock(int mode, Coordinate coor,
-      {
-        int addRow = 0, int addCol = 0,
-        OnKingWalkable onKingWalkable,
-        OnKingWalkableAfterKilling onKingWalkableAfterKilling,
-        OnKingUnWalkable onKingUnwalkable}) {
+      {int addRow = 0,
+      int addCol = 0,
+      OnKingWalkable onKingWalkable,
+      OnKingWalkableAfterKilling onKingWalkableAfterKilling,
+      OnKingUnWalkable onKingUnwalkable}) {
     if (!hasMen(coor)) {
       if (mode == MODE_WALK_NORMAL) {
         setHighlightWalkable(coor);
@@ -380,8 +406,8 @@ class GameTable {
     } else {
       if (hasMenEnemy(coor)) {
         Men enemyKilled = getBlockTable(coor).men;
-        Coordinate nextCoorAfterKill = Coordinate.of(
-            coor, addRow: addRow, addCol: addCol);
+        Coordinate nextCoorAfterKill =
+            Coordinate.of(coor, addRow: addRow, addCol: addCol);
         if (!hasMen(nextCoorAfterKill)) {
           if (onKingWalkableAfterKilling != null) {
             onKingWalkableAfterKilling(
